@@ -22,18 +22,12 @@ const path = require("path");
 
 
 async function main() {
+    console.log("-------------------------------");
     // Configure accounts and client
-    // live account code
-    // const operatorId = AccountId.fromString(process.env.OPERATOR_ID);
-    // const operatorKey = PrivateKey.fromString(process.env.OPERATOR_PVKEY);
-
-    // const client = Client.forTestnet().setOperator(operatorId, operatorKey);
 
     // test account code
     const myAccountId = process.env.MY_ACCOUNT_ID;
     const myPrivateKey = process.env.MY_PRIVATE_KEY;
-    // const myDelegateId = process.env.MY_DELEGATE_ADDRESS;
-    // const myPublicKey = process.env.MY_PUBLIC_KEY;
 
     // If we weren't able to grab it, we should throw a new error
     if (myAccountId == null ||
@@ -41,80 +35,85 @@ async function main() {
         throw new Error("Environment variables myAccountId and myPrivateKey must be present");
     }
 
-    // const operatorId = AccountId.fromString(myAccountId)
-    // const treasuryId = AccountId.fromString(myAccountId)
-
-    // // If we weren't able to grab it, we should throw a new error
-    // const supplyKey = PrivateKey.fromString(process.env.MY_SUPPLY_KEY)
-    // const adminKey = PrivateKey.fromString(process.env.MY_ADMIN_KEY)
-
-    // if (supplyKey == null ||
-    //     adminKey == null ) {
-    //     console.log(`- Generating supply and adming keys`);
-    //     const supplyKey = PrivateKey.generate()
-    //     const adminKey = PrivateKey.generate()
-    // }
-
-    // console.log(`- The private supply key is: ${supplyKey} \n`);
-    // console.log(`- The private admin key is: ${adminKey} \n`);
-
     const operatorKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY)
-    const treasuryKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY)
+    // const treasuryKey = PrivateKey.fromString(process.env.MY_PRIVATE_KEY)
 
     const client = Client.forTestnet();
 
     client.setOperator(myAccountId, myPrivateKey);
 
     // *************************
-    // * Creates a new account *
+    // * Creates accounts for contract parties *
     // *************************
 
-    //Create new keys
-    const newAccountPrivateKey = await PrivateKey.generateED25519();
-    const newAccountPublicKey = newAccountPrivateKey.publicKey;
+    //Create new keys for each party
+    const contractorAccountPrivateKey = await PrivateKey.generateECDSA();
+    const contractorAccountPublicKey = contractorAccountPrivateKey.publicKey;
+
+    // const companyAccountPrivateKey = await PrivateKey.generateECDSA();
+    // const companyAccountPublicKey = companyAccountPrivateKey.publicKey;
+    const companyAccountPrivateKey = operatorKey;
+    const companyAccountPublicKey = companyAccountPrivateKey.publicKey;
+    // console.log(PublicKey.fromString(process.env.MY_PUBLIC_KEY));
+    // console.log(companyAccountPublicKey);
+
+    const charityAccountPrivateKey = await PrivateKey.generateECDSA();
+    const charityAccountPublicKey = charityAccountPrivateKey.publicKey;
     
+    //Create a new company account with 1000000 tinybar starting balance
+    const companyAccountTransactionResponse = await new AccountCreateTransaction()
+        .setKey(companyAccountPublicKey)
+        .setInitialBalance(Hbar.fromTinybars(1000000))
+        .execute(client);
+    const getCompanyReceipt = await companyAccountTransactionResponse.getReceipt(client);
+    const companyAccountId = getCompanyReceipt.accountId;
+
     //Create a new account with 1,000 tinybar starting balance
-    const newAccountTransactionResponse = await new AccountCreateTransaction()
-        .setKey(newAccountPublicKey)
+    const contractorAccountTransactionResponse = await new AccountCreateTransaction()
+        .setKey(contractorAccountPublicKey)
         .setInitialBalance(Hbar.fromTinybars(1000))
         .execute(client);
-    
     // Get the new account ID
-    const getReceipt = await newAccountTransactionResponse.getReceipt(client);
-    const newAccountId = getReceipt.accountId;
-    
-    console.log("The new account ID is: " +newAccountId);
-    
-    //Verify the account balance
-    const accountBalance = await new AccountBalanceQuery()
-        .setAccountId(newAccountId)
+    const getContractorReceipt = await contractorAccountTransactionResponse.getReceipt(client);
+    const contractorAccountId = getContractorReceipt.accountId;
+        
+    //Create a new account with 1,000 tinybar starting balance
+    const charityAccountTransactionResponse = await new AccountCreateTransaction()
+        .setKey(charityAccountPublicKey)
+        .setInitialBalance(Hbar.fromTinybars(1000))
         .execute(client);
+    // Get the new account ID
+    const getCharityReceipt = await charityAccountTransactionResponse.getReceipt(client);
+    const charityAccountId = getCharityReceipt.accountId;
+
+    console.log("The account ID is: " +myAccountId);
+    console.log("The company account ID is: " +companyAccountId);
+    console.log("The contractor account ID is: " +contractorAccountId);
+    console.log("The charity account ID is: " +charityAccountId);
     
-    console.log("The new account balance is: " +accountBalance.hbars.toTinybars() +" tinybar.");
-    /*
-    //Create the transfer transaction
-    const sendHbar = await new TransferTransaction()
-        .addHbarTransfer(myAccountId, Hbar.fromTinybars(-1000))
-        .addHbarTransfer(newAccountId, Hbar.fromTinybars(1000))
-        .execute(client);*/
-    //
-    // //Verify the transaction reached consensus
-    // const transactionReceipt = await sendHbar.getReceipt(client);
-    // console.log("The transfer transaction from my account to the new account was: " + transactionReceipt.status.toString());
-    //
-    // //Request the cost of the query
-    // const queryCost = await new AccountBalanceQuery()
-    //     .setAccountId(newAccountId)
-    //     .getCost(client);
-    //
-    // console.log("The cost of query is: " +queryCost);
-    //
-    // //Check the new account's balance
-    // const getNewBalance = await new AccountBalanceQuery()
-    //     .setAccountId(newAccountId)
+    // //Verify the account balance
+    // const accountBalance = await new AccountBalanceQuery()
+    //     .setAccountId(companyAccountId)
     //     .execute(client);
-    //
-    // console.log("The account balance after the transfer is: " +getNewBalance.hbars.toTinybars() +" tinybar.")
+    
+    // console.log("\nThe company account balance is: " +accountBalance.hbars.toTinybars() +" tinybar.");
+
+
+    //Check the account balances
+    const getNewBalanceCompany = await new AccountBalanceQuery()
+        .setAccountId(companyAccountId)
+        .execute(client);
+    console.log("\nThe Company account balance is: " +getNewBalanceCompany.hbars.toTinybars() +" tinybar");
+
+    const getNewBalanceContractor = await new AccountBalanceQuery()
+        .setAccountId(contractorAccountId)
+        .execute(client);
+    console.log("The Contractor account balance is: " +getNewBalanceContractor.hbars.toTinybars() +" tinybar");
+
+    const getNewBalanceCharity = await new AccountBalanceQuery()
+        .setAccountId(charityAccountId)
+        .execute(client);
+    console.log("The Charity account balance is: " +getNewBalanceCharity.hbars.toTinybars() +" tinybar");
 
 
     // *************************
@@ -153,14 +152,14 @@ async function main() {
     let hash = crypto.createHash('md5').update(buf).digest("hex")
     console.log('contract hash is:' + hash);
 
-    console.log('storing proof on Hedera');
+    console.log('storing contract on Hedera using HCS');
     let HCSData = {
       "payload": "\"" + hash + "\"",
       "submit": "direct"
-    }
+    };
     const HEADER = {
       headers: { Accept: 'application/json' },
-    }
+    };
     axios
     .post('http://0.0.0.0:8080/v1/action/', HCSData, HEADER)
     .then((response) => {
@@ -172,7 +171,7 @@ async function main() {
     })
     .catch((e) => {
       //console.error(e)
-    })
+    });
 
     // *************************
     // * invoke the contract with some data from OpenESG *
@@ -197,7 +196,8 @@ async function main() {
         $class: "org.accordproject.runtime.State",
     };
     const engine = new Engine();
-    const ESGResponse = await engine.trigger(clause, ESGRequest, contractState);
+    const ESGWrappedResponse = await engine.trigger(clause, ESGRequest, contractState);
+    const ESGResponse = ESGWrappedResponse.response;
     console.log(ESGResponse);
 
     // *************************
@@ -209,10 +209,10 @@ async function main() {
             "ESGResponse": ESGResponse
         },
         "submit": "direct"
-    }
-
+    };
+    console.log('storing contract invocation results on Hedera using HCS');
     axios
-    .post('http://0.0.0.0:8080/v1/action/', HCSData, HEADER)
+    .post('http://0.0.0.0:8080/v1/action/', HCSTransactionData, HEADER)
     .then((response) => {
       if (response.status === 201) {
         console.log('Req body:', response.data)
@@ -222,17 +222,59 @@ async function main() {
     })
     .catch((e) => {
       //console.error(e)
-    })
+    });
 
     // *************************
     // * process token transfer and penalty payment using HTS *
     // *************************
 
-    //TODO get this working with Emitted Payment Obligations in the future
-    //check if there is a penalty to be paid
-    // if (ESGResponse.penaltyAmountDeduction > 0.0)
+    // TODO get this working with Emitted Payment Obligations in the future
+    // check if there is a penalty to be paid
+    // console.log(ESGResponse.penaltyAmountDeduction);
+    if (ESGResponse.penaltyAmountDeduction > 0) {
+        console.log("there is a penalty payment of:" + ESGResponse.penaltyAmountDeduction + " payable in:" + ESGResponse.penaltyCurrency + " to be sent to: " + ESGResponse.nameOfCharity)
 
-    // }
-   
+        //Create the charity penalty transfer transaction (hardcoding tinybars and wallet address which should come from the contract)
+        const sendHbar = await new TransferTransaction()
+            // .addHbarTransfer(companyAccountId, Hbar.fromTinybars(-10))
+            // .addHbarTransfer(charityAccountId, Hbar.fromTinybars(10))
+            .addHbarTransfer(companyAccountId, Hbar.fromTinybars(-ESGResponse.penaltyAmountDeduction))
+            .addHbarTransfer(charityAccountId, Hbar.fromTinybars(ESGResponse.penaltyAmountDeduction))
+            .execute(client);
+        
+        //Verify the transaction reached consensus
+        const transactionReceipt = await sendHbar.getReceipt(client);
+        console.log("The penalty transfer transaction from the company account to the charity account was: " + transactionReceipt.status.toString());
+    } else {
+        console.log("there is no penalty payment");
+    }
+    console.log("processing contractor payment");
+    //Create the contracter transfer transaction (hardcoding tinybars and wallet address which should come from the contract)
+    const sendHbar = await new TransferTransaction()
+        .addHbarTransfer(companyAccountId, Hbar.fromTinybars(-ESGResponse.paymentAmount))
+        .addHbarTransfer(contractorAccountId, Hbar.fromTinybars(ESGResponse.paymentAmount))
+        .execute(client);
+
+    //Verify the transaction reached consensus
+    const transactionReceipt = await sendHbar.getReceipt(client);
+    console.log("The penalty transfer transaction from the company account to the charity account was: " + transactionReceipt.status.toString());
+
+
+    //process the payment to the subcontractor
+    //Check the account balances
+    const getFinalBalanceCompany = await new AccountBalanceQuery()
+        .setAccountId(companyAccountId)
+        .execute(client);
+    console.log("\nThe Company account balance after the transfer is: " +getFinalBalanceCompany.hbars.toTinybars() +" tinybar");
+
+    const getFinalBalanceContractor = await new AccountBalanceQuery()
+        .setAccountId(contractorAccountId)
+        .execute(client);
+    console.log("The Contractor account balance after the transfer is: " +getFinalBalanceContractor.hbars.toTinybars() +" tinybar");
+
+    const getFinalBalanceCharity = await new AccountBalanceQuery()
+        .setAccountId(charityAccountId)
+        .execute(client);
+    console.log("The Charity account balance after the transfer is: " +getFinalBalanceCharity.hbars.toTinybars() +" tinybar");
 }
 main();
