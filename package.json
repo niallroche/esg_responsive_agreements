@@ -1,0 +1,10 @@
+{
+    "dependencies": {
+      "@accordproject/cicero-core": "^0.22.0",
+      "@accordproject/cicero-engine": "^0.22.0",
+      "@hashgraph/hethers": "^1.1.0",
+      "@hashgraph/sdk": "^2.13.1",
+      "cicero-core": "^0.2.46",
+      "dotenv": "^16.0.1"
+    }
+}
